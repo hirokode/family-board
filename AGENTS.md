@@ -73,11 +73,11 @@
 ## デプロイ
 
 - GAS：`clasp push` のあと、既存のデプロイを更新する（URL を変えないこと。新規デプロイを作ると config.js の URL が変わってしまう）。
-- 画面：GitHub に push すると GitHub Pages に反映される（GitHub 接続後に設定予定）。
+- 画面：GitHub に push すると GitHub Pages（ `https://hirokode.github.io/family-board/` ）に自動で反映される。
 
 ### ▶ボタン（deploy.ps1）
 
-`deploy.ps1` が「push →  既存デプロイの更新 → git コミット」をまとめて行う。
+`deploy.ps1` が「push → 既存デプロイの更新 → git コミット → git push」をまとめて行う。
 変更メモはそのままコミットメッセージとデプロイの説明になる。
 
 ```bash
@@ -91,13 +91,13 @@ cd "C:\Users\hiro2\OneDrive\04_Claude Code\家族\family-board"; .\deploy.ps1 "�
 | 1 | `clasp push -f` | ローカルの `gas/` を Apps Script に置く |
 | 2 | `clasp deploy -i <デプロイID> -d "<変更メモ>"` | 公開中のデプロイを更新する（`/exec` の URL は変わらない） |
 | 3 | `git add -A` → `git commit` | 変更をコミットする（変更がなければ何もしない） |
+| 4 | `git push` | GitHub に反映する（GitHub Pages が自動更新） |
 
 - 途中で失敗したら、そこで止まる（push に失敗したら deploy はしない）。
 - **デプロイIDは `deploy.local.json` に書く。** このファイルは `.gitignore` 済みでGitには入らない。
   中身は `{ "deploymentId": "<デプロイID>" }` の1行だけ。値は `アプリURL.txt` に控えてある。
 - `clasp` は v2 系（2.4.2）を前提にしたコマンドの書き方。
-- GitHub への push は、GitHub 接続後にこの仕組みへ追加する。
-- 実行後はブラウザを `Ctrl + F5` で強制リロードして確認する。
+- 実行後はブラウザを `Ctrl + F5` で強制リロードして確認する（GitHub Pages は push 後数十秒で反映）。
 
 ## このアプリ固有のルール
 

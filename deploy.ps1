@@ -1,9 +1,10 @@
-﻿# 家族ボード：▶ボタン用のデプロイスクリプト
+# 家族ボード：▶ボタン用のデプロイスクリプト
 #
-# 次の3つを一度に行う。
+# 次の4つを一度に行う。
 #   1. clasp push -f   … ローカルの gas/ を Apps Script に置く
 #   2. clasp deploy -i … 公開中のデプロイを更新する（/exec のURLは変わらない）
 #   3. git commit      … 変更をコミットする
+#   4. git push        … GitHub に反映する（GitHub Pages が自動更新）
 #
 # 使い方:
 #   .\deploy.ps1 "変更メモ"
@@ -36,7 +37,7 @@ if ([string]::IsNullOrWhiteSpace($deploymentId)) {
 
 # --- 1. コードをサーバーに置く ---
 Write-Host ''
-Write-Host '[1/3] clasp push … コードを Apps Script に置きます' -ForegroundColor Cyan
+Write-Host '[1/4] clasp push … コードを Apps Script に置きます' -ForegroundColor Cyan
 clasp push -f
 if ($LASTEXITCODE -ne 0) {
   Write-Host 'push に失敗しました。ここで中止します（公開中のアプリは変わっていません）。' -ForegroundColor Red
@@ -45,7 +46,7 @@ if ($LASTEXITCODE -ne 0) {
 
 # --- 2. 公開中のデプロイを更新する（URLは変わらない） ---
 Write-Host ''
-Write-Host '[2/3] clasp deploy … 公開中のURLの中身を差し替えます' -ForegroundColor Cyan
+Write-Host '[2/4] clasp deploy … 公開中のURLの中身を差し替えます' -ForegroundColor Cyan
 clasp deploy -i $deploymentId -d $Message
 if ($LASTEXITCODE -ne 0) {
   Write-Host 'deploy に失敗しました。コードは置かれましたが、公開はまだ古いままです。' -ForegroundColor Red
@@ -54,12 +55,21 @@ if ($LASTEXITCODE -ne 0) {
 
 # --- 3. gitコミット ---
 Write-Host ''
-Write-Host '[3/3] git commit … 変更を記録します' -ForegroundColor Cyan
+Write-Host '[3/4] git commit … 変更を記録します' -ForegroundColor Cyan
 git add -A
 if ([string]::IsNullOrWhiteSpace((git status --porcelain))) {
   Write-Host '変更がなかったので、コミットはしていません。'
 } else {
   git commit -m $Message
+}
+
+# --- 4. GitHubへ反映 ---
+Write-Host ''
+Write-Host '[4/4] git push … GitHub（GitHub Pages）に反映します' -ForegroundColor Cyan
+git push
+if ($LASTEXITCODE -ne 0) {
+  Write-Host 'GitHub への push に失敗しました。ネットワーク状態などを確認してください。' -ForegroundColor Red
+  exit 1
 }
 
 Write-Host ''
