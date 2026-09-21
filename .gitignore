@@ -1,0 +1,10 @@
+# clasp の接続情報（ローカル専用）
+.clasp.json
+.clasprc.json
+
+# その他
+node_modules/
+.DS_Store
+Thumbs.db
+*.local.*
+.env
