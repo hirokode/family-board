@@ -36,6 +36,8 @@
 | config.js | GAS WebアプリのURL（API_URL）だけを書く |
 | gas/Code.gs | API本体（シートの自動作成、各操作） |
 | gas/appsscript.json | GASの設定（タイムゾーン、Webアプリの公開設定） |
+| deploy.ps1 | ▶ボタン用（push → デプロイ更新 → gitコミット） |
+| serve.js | ローカル確認用の簡易サーバー（`node serve.js` → http://localhost:5500 ） |
 
 ## スプレッドシートの構成（初回アクセス時に自動作成）
 
