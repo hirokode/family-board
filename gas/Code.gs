@@ -105,6 +105,7 @@ function setup() {
 /* ========== 各操作 ========== */
 
 function bootstrap_() {
+  ensureDefaultMembers_();
   const today = today_();
   const members = readRows_(SHEETS.members)
     .filter(function (r) { return String(r.name).trim(); })
@@ -118,6 +119,33 @@ function bootstrap_() {
     errands: errands_(),
     home: homeFor_(members),
   };
+}
+
+function ensureDefaultMembers_() {
+  const sh = sheet_(SHEETS.members);
+  if (!sh) return;
+  const rows = readRows_(SHEETS.members);
+  
+  const brother = rows.filter(function (r) { return String(r.name).trim() === '弟'; })[0];
+  if (!brother) {
+    withLock_(function () {
+      sh.appendRow([cell_('弟'), cell_('👦'), true]);
+    });
+  } else {
+    if (!brother.icon || brother.icon === '👤') {
+      sh.getRange(brother._row, 2).setValue(cell_('👦'));
+    }
+    if (!bool_(brother.trackHome)) {
+      sh.getRange(brother._row, 3).setValue(true);
+    }
+  }
+
+  const brotherBig = rows.filter(function (r) { return String(r.name).trim() === '兄'; })[0];
+  if (!brotherBig && rows.length === 0) {
+    withLock_(function () {
+      sh.appendRow([cell_('兄'), cell_('🧑'), true]);
+    });
+  }
 }
 
 function toggleChore_(req) {

@@ -229,7 +229,7 @@
         <p class="gate-lead">この端末を使う人を選んでください。あとから変えられます。</p>
         ${members.length ? `<div class="who-grid">${members.map((m) => `
           <button class="who" data-act="pick-me" data-name="${esc(m.name)}">
-            <span class="who-icon" aria-hidden="true">${esc(m.icon)}</span>${esc(m.name)}
+            <span class="who-icon" aria-hidden="true">${esc(m.icon || '👤')}</span>${esc(m.name)}
           </button>`).join('')}</div>`
         : '<p class="empty">家族が登録されていません。スプレッドシートの「Members」シートに追加してください。</p>'}
         <button class="link" data-act="logout">合言葉を入れ直す</button>
@@ -238,7 +238,7 @@
 
   function viewMain() {
     const d = state.data;
-    const me = d.members.find((m) => m.name === state.me) || { name: state.me, icon: '' };
+    const me = d.members.find((m) => m.name === state.me) || { name: state.me, icon: '👤' };
     let body;
     if (state.tab === 'errands') body = viewErrands();
     else if (state.tab === 'home') body = viewHome();
