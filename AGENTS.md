@@ -72,12 +72,36 @@
 
 - GAS：`clasp push` のあと、既存のデプロイを更新する（URL を変えないこと。新規デプロイを作ると config.js の URL が変わってしまう）。
 - 画面：GitHub に push すると GitHub Pages に反映される（GitHub 接続後に設定予定）。
-- ▶ボタンの仕組みと実際のコマンドは、設定後にここへ追記する。
+
+### ▶ボタン（deploy.ps1）
+
+`deploy.ps1` が「push →  既存デプロイの更新 → git コミット」をまとめて行う。
+変更メモはそのままコミットメッセージとデプロイの説明になる。
+
+```bash
+cd "C:\Users\hiro2\OneDrive\04_Claude Code\家族\family-board"; .\deploy.ps1 "変更メモ"
+```
+
+中でやっていること。
+
+| 順番 | コマンド | 内容 |
+|---|---|---|
+| 1 | `clasp push -f` | ローカルの `gas/` を Apps Script に置く |
+| 2 | `clasp deploy -i <デプロイID> -d "<変更メモ>"` | 公開中のデプロイを更新する（`/exec` の URL は変わらない） |
+| 3 | `git add -A` → `git commit` | 変更をコミットする（変更がなければ何もしない） |
+
+- 途中で失敗したら、そこで止まる（push に失敗したら deploy はしない）。
+- **デプロイIDは `deploy.local.json` に書く。** このファイルは `.gitignore` 済みでGitには入らない。
+  中身は `{ "deploymentId": "<デプロイID>" }` の1行だけ。値は `アプリURL.txt` に控えてある。
+- `clasp` は v2 系（2.4.2）を前提にしたコマンドの書き方。
+- GitHub への push は、GitHub 接続後にこの仕組みへ追加する。
+- 実行後はブラウザを `Ctrl + F5` で強制リロードして確認する。
 
 ## このアプリ固有のルール
 
 - 合言葉（スクリプト プロパティ FAMILY_PASSCODE）は、コードにもコミットにも書かない。
 - `.clasp.json`（スクリプトID）はコミットしない（.gitignore 済み）。
+- スプレッドシート・スクリプト・デプロイのID／URLは `アプリURL.txt` と `deploy.local.json` にだけ書く（どちらも .gitignore 済み）。
 - 家族の実名・生活パターンがわかる情報をコードやコミットメッセージに書かない（公開リポジトリのため）。
 - シートの列を増やすときは、SHEETS の headers と、既存シートの見出し行の両方を更新する。
 - 変更後は、家事の切り替え・おつかい登録・帰宅状況の更新が動くことをスマホ幅で確認する。
