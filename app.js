@@ -7,6 +7,7 @@
     { key: 'chores', label: '家事', icon: '🧹' },
     { key: 'errands', label: 'おつかい', icon: '🛒' },
     { key: 'home', label: '帰宅', icon: '🏠' },
+    { key: 'settings', label: '設定', icon: '⚙️' },
   ];
   // tone: 画面上の色分け（home=黄、coming=青、out=白）
   const HOME_STATUSES = [
@@ -17,8 +18,12 @@
     { key: '遅くなる', emoji: '🌙', tone: 'out' },
   ];
   const DINNER = ['いる', 'いらない', '未定'];
+  const CHORE_ICONS = ['🧹', '🧺', '🍳', '👕', '🛁', '🗑️', '🍽️', '🛒', '🐕', '🪴', '📦', '🛏️', '🪟', '🧴', '🌸'];
+  const MEMBER_ICONS = ['🧑', '👦', '👧', '👩', '👨', '👵', '🧓', '👶', '🐱', '🐶', '🐰', '🐻'];
   const POLL_MS = 60 * 1000;
   const EMPTY_ERRAND = { title: '', items: '', budget: '', memo: '' };
+  const EMPTY_CHORE = { name: '', icon: '🧹' };
+  const EMPTY_MEMBER = { name: '', icon: '👦', trackHome: true };
 
   const state = {
     passcode: load(LS.pass),
@@ -29,6 +34,11 @@
     errandFormOpen: false,
     errandDraft: { ...EMPTY_ERRAND },
     homeDraft: null,
+    homeTargetMember: '',
+    choreFormOpen: false,
+    choreDraft: { ...EMPTY_CHORE },
+    memberFormOpen: false,
+    memberDraft: { ...EMPTY_MEMBER },
     doneOpen: false,
   };
 
@@ -229,7 +239,11 @@
   function viewMain() {
     const d = state.data;
     const me = d.members.find((m) => m.name === state.me) || { name: state.me, icon: '' };
-    const body = state.tab === 'errands' ? viewErrands() : state.tab === 'home' ? viewHome() : viewChores();
+    let body;
+    if (state.tab === 'errands') body = viewErrands();
+    else if (state.tab === 'home') body = viewHome();
+    else if (state.tab === 'settings') body = viewSettings();
+    else body = viewChores();
     return `
       <header class="top">
         <div class="top-row">
@@ -241,7 +255,7 @@
             <span aria-hidden="true">${esc(me.icon)}</span> ${esc(me.name)}
           </button>
         </div>
-        ${state.tab !== 'home' ? `<div class="magnet-board">${homeMagnets()}</div>` : ''}
+        ${state.tab !== 'home' && state.tab !== 'settings' ? `<div class="magnet-board">${homeMagnets()}</div>` : ''}
       </header>
       <main class="panel">${body}</main>
       <nav class="tabs" aria-label="画面の切り替え">${TABS.map((t) => `
@@ -292,7 +306,7 @@
         ${chores.length ? `<ul class="chores">${chores.map((c) => `
           <li>
             <button class="chore${c.done ? ' is-done' : ''}" data-act="toggle-chore" data-id="${esc(c.id)}" aria-pressed="${c.done}">
-              <span class="chore-icon" aria-hidden="true">${esc(c.icon)}</span>
+              ${c.icon ? `<span class="chore-icon" aria-hidden="true">${esc(c.icon)}</span>` : '<span class="chore-icon is-empty" aria-hidden="true"></span>'}
               <span class="chore-body">
                 <span class="chore-name">${esc(c.name)}</span>
                 ${c.done ? `<span class="chore-meta">${c.by ? esc(c.by) + 'が' : ''}${esc(fmtTime(c.updatedAt))}に完了</span>` : ''}
@@ -300,8 +314,8 @@
               <span class="dot" aria-hidden="true"></span>
             </button>
           </li>`).join('')}</ul>`
-        : '<p class="empty">家事の項目がありません。スプレッドシートの「Chores」シートに追加してください。</p>'}
-        <p class="hint">家事の項目は、スプレッドシートの「Chores」シートで追加・変更できます。</p>
+        : '<p class="empty">家事の項目がありません。「設定」タブから家事を追加してください。</p>'}
+        <p class="hint">家事の追加や削除は「設定」タブから行えます。</p>
       </section>`;
   }
 
@@ -373,36 +387,188 @@
       return `
         <section>
           <h2>帰宅状況</h2>
-          <p class="empty">帰宅状況を共有する人が決まっていません。スプレッドシートの「Members」シートで、その人の trackHome を TRUE にしてください。</p>
+          <p class="empty">帰宅状況を共有する人が決まっていません。「設定」タブで、その人の帰宅カードを ON にしてください。</p>
         </section>`;
     }
-    const mine = tracked.find((h) => h.member === state.me);
-    if (mine && !state.homeDraft) {
-      state.homeDraft = { status: mine.status || '', eta: mine.eta || '', dinner: mine.dinner || '未定', note: '' };
+
+    if (!state.homeTargetMember || !tracked.some((h) => h.member === state.homeTargetMember)) {
+      const myTracked = tracked.find((h) => h.member === state.me);
+      state.homeTargetMember = myTracked ? myTracked.member : tracked[0].member;
+    }
+    const targetMember = state.homeTargetMember;
+    const currentStatus = tracked.find((h) => h.member === targetMember);
+
+    if (!state.homeDraft || state.homeDraft._member !== targetMember) {
+      state.homeDraft = {
+        _member: targetMember,
+        status: currentStatus ? (currentStatus.status || '') : '',
+        eta: currentStatus ? (currentStatus.eta || '') : '',
+        dinner: currentStatus ? (currentStatus.dinner || '未定') : '未定',
+        note: '',
+      };
     }
     const f = state.homeDraft;
+
     return `
       <section aria-labelledby="h-home">
         <h2 id="h-home">帰宅状況</h2>
         ${tracked.map(statusCard).join('')}
-        ${mine ? `
-          <form id="home-form" class="note">
-            <h3 class="note-title">今の状況を家族に伝える</h3>
-            <div class="choices" role="group" aria-label="今の状況">${HOME_STATUSES.map((s) => `
-              <button type="button" class="choice" data-act="home-status" data-value="${s.key}" aria-pressed="${f.status === s.key}">
-                <span class="choice-emoji" aria-hidden="true">${s.emoji}</span>${s.key}
-              </button>`).join('')}
-            </div>
-            <label>到着予定（任意）<input name="eta" type="time" value="${esc(f.eta)}"></label>
-            <p class="field-label" id="dinner-label">夕飯</p>
-            <div class="seg" role="group" aria-labelledby="dinner-label">${DINNER.map((v) => `
-              <button type="button" class="choice" data-act="home-dinner" data-value="${v}" aria-pressed="${f.dinner === v}">${v}</button>`).join('')}
-            </div>
-            <label>ひとこと（任意）<input name="note" maxlength="60" value="${esc(f.note)}" placeholder="例：駅に着いたら連絡します"></label>
-            <button type="submit" class="btn primary wide" ${f.status ? '' : 'disabled'}>家族に伝える</button>
-          </form>`
-        : `<p class="hint">帰宅状況は、${tracked.map((h) => esc(h.member)).join('、')}が自分の端末から更新します。</p>`}
+
+        <form id="home-form" class="note">
+          <h3 class="note-title">${esc(targetMember)}の状況を家族に伝える</h3>
+
+          ${tracked.length > 1 ? `
+            <p class="field-label">誰の状況？</p>
+            <div class="seg" role="group" aria-label="状況を伝える人">
+              ${tracked.map((h) => `
+                <button type="button" class="choice" data-act="pick-home-target" data-member="${esc(h.member)}" aria-pressed="${targetMember === h.member}">
+                  ${esc(h.member)}
+                </button>`).join('')}
+            </div>` : ''}
+
+          <div class="choices" role="group" aria-label="今の状況">${HOME_STATUSES.map((s) => `
+            <button type="button" class="choice" data-act="home-status" data-value="${s.key}" aria-pressed="${f.status === s.key}">
+              <span class="choice-emoji" aria-hidden="true">${s.emoji}</span>${s.key}
+            </button>`).join('')}
+          </div>
+          <label>到着予定（任意）<input name="eta" type="time" value="${esc(f.eta)}"></label>
+          <p class="field-label" id="dinner-label">夕飯</p>
+          <div class="seg" role="group" aria-labelledby="dinner-label">${DINNER.map((v) => `
+            <button type="button" class="choice" data-act="home-dinner" data-value="${v}" aria-pressed="${f.dinner === v}">${v}</button>`).join('')}
+          </div>
+          <label>ひとこと（任意）<input name="note" maxlength="60" value="${esc(f.note)}" placeholder="例：駅に着いたら連絡します"></label>
+          <button type="submit" class="btn primary wide" ${f.status ? '' : 'disabled'}>家族に伝える</button>
+        </form>
       </section>`;
+  }
+
+  function viewSettings() {
+    const chores = state.data.chores;
+    const members = state.data.members;
+
+    return `
+      <section aria-labelledby="h-settings">
+        <h2 id="h-settings">設定</h2>
+
+        <!-- 家事の管理 -->
+        <div class="setting-card">
+          <div class="setting-head">
+            <div>
+              <h3 class="setting-title">毎日の家事</h3>
+              <p class="setting-sub">毎日の家事リストに追加・削除できます</p>
+            </div>
+            ${state.choreFormOpen ? '' : '<button type="button" class="btn primary btn-sm" data-act="open-chore-form">＋ 追加</button>'}
+          </div>
+
+          ${state.choreFormOpen ? viewChoreForm() : ''}
+
+          <ul class="setting-list">
+            ${chores.map((c) => `
+              <li class="setting-item">
+                <span class="setting-icon">${esc(c.icon || '—')}</span>
+                <span class="setting-name">${esc(c.name)}</span>
+                <button type="button" class="btn-del" data-act="delete-chore" data-id="${esc(c.id)}" data-name="${esc(c.name)}" aria-label="${esc(c.name)}を削除">削除</button>
+              </li>`).join('')}
+          </ul>
+        </div>
+
+        <!-- 帰宅カード・家族の管理 -->
+        <div class="setting-card">
+          <div class="setting-head">
+            <div>
+              <h3 class="setting-title">帰宅カード・家族</h3>
+              <p class="setting-sub">帰宅カードを ON にすると、帰宅タブや画面上に状況が表示されます</p>
+            </div>
+            ${state.memberFormOpen ? '' : '<button type="button" class="btn primary btn-sm" data-act="open-member-form">＋ 家族を追加</button>'}
+          </div>
+
+          ${state.memberFormOpen ? viewMemberForm() : ''}
+
+          <ul class="setting-list">
+            ${members.map((m) => `
+              <li class="setting-item">
+                <span class="setting-icon">${esc(m.icon || '👤')}</span>
+                <span class="setting-name">${esc(m.name)}</span>
+                <button type="button" class="btn btn-sm ${m.trackHome ? 'track-on' : 'track-off'}" data-act="toggle-track-home" data-name="${esc(m.name)}" data-track="${!m.trackHome}">
+                  帰宅カード: ${m.trackHome ? 'ON' : 'OFF'}
+                </button>
+                <button type="button" class="btn-del" data-act="delete-member" data-name="${esc(m.name)}" aria-label="${esc(m.name)}を削除">削除</button>
+              </li>`).join('')}
+          </ul>
+        </div>
+
+        <!-- 端末・アカウント操作 -->
+        <div class="setting-card">
+          <h3 class="setting-title">端末・合言葉</h3>
+          <p class="setting-sub">このスマホを使う人の切り替えや、合言葉の入れ直しができます</p>
+          <div class="setting-ops">
+            <button type="button" class="btn wide" data-act="switch-me">使う人を切り替える（いま：${esc(state.me)}）</button>
+            <button type="button" class="link danger" data-act="logout">合言葉を入れ直す（ログアウト）</button>
+          </div>
+        </div>
+      </section>`;
+  }
+
+  function viewChoreForm() {
+    const f = state.choreDraft;
+    return `
+      <form id="chore-form" class="note chore-form-box" autocomplete="off">
+        <h4 class="note-title">家事を新しく追加</h4>
+        <label>家事の名前
+          <input name="name" required maxlength="40" placeholder="例：お風呂掃除" value="${esc(f.name)}">
+        </label>
+
+        <div class="field-group">
+          <p class="field-label">アイコン（絵文字・自由入力または「なし」）</p>
+          <div class="icon-input-row">
+            <div class="icon-preview">${f.icon ? esc(f.icon) : '<span class="icon-none">なし</span>'}</div>
+            <button type="button" class="btn btn-sm ${!f.icon ? 'btn-selected' : ''}" data-act="clear-chore-icon">なしにする</button>
+            <input type="text" class="icon-custom-input" id="chore-custom-icon" maxlength="4" placeholder="手入力" value="${esc(f.icon)}">
+          </div>
+          <div class="emoji-grid" role="group" aria-label="よく使う家事アイコン">
+            ${CHORE_ICONS.map((emoji) => `
+              <button type="button" class="emoji-btn ${f.icon === emoji ? 'is-selected' : ''}" data-act="pick-chore-icon" data-icon="${emoji}">${emoji}</button>`).join('')}
+          </div>
+        </div>
+
+        <div class="actions">
+          <button type="button" class="btn" data-act="close-chore-form">やめる</button>
+          <button type="submit" class="btn primary">追加する</button>
+        </div>
+      </form>`;
+  }
+
+  function viewMemberForm() {
+    const f = state.memberDraft;
+    return `
+      <form id="member-form" class="note member-form-box" autocomplete="off">
+        <h4 class="note-title">家族を新しく追加</h4>
+        <label>名前
+          <input name="name" required maxlength="20" placeholder="例：弟" value="${esc(f.name)}">
+        </label>
+
+        <div class="field-group">
+          <p class="field-label">アイコン（絵文字）</p>
+          <div class="icon-input-row">
+            <div class="icon-preview">${esc(f.icon || '👤')}</div>
+            <input type="text" class="icon-custom-input" id="member-custom-icon" maxlength="4" placeholder="手入力" value="${esc(f.icon)}">
+          </div>
+          <div class="emoji-grid" role="group" aria-label="家族アイコン候補">
+            ${MEMBER_ICONS.map((emoji) => `
+              <button type="button" class="emoji-btn ${f.icon === emoji ? 'is-selected' : ''}" data-act="pick-member-icon" data-icon="${emoji}">${emoji}</button>`).join('')}
+          </div>
+        </div>
+
+        <label class="check-box-label">
+          <input type="checkbox" name="trackHome" ${f.trackHome ? 'checked' : ''}>
+          <span>帰宅カードを表示する（帰宅状況を共有）</span>
+        </label>
+
+        <div class="actions">
+          <button type="button" class="btn" data-act="close-member-form">やめる</button>
+          <button type="submit" class="btn primary">追加する</button>
+        </div>
+      </form>`;
   }
 
   function statusCard(h) {
@@ -492,6 +658,66 @@
       case 'reopen-errand':
         mutate('reopenErrand', { id });
         break;
+      case 'pick-home-target':
+        state.homeTargetMember = btn.dataset.member;
+        state.homeDraft = null;
+        render();
+        break;
+      case 'open-chore-form':
+        state.choreFormOpen = true;
+        render();
+        document.querySelector('#chore-form input[name="name"]')?.focus();
+        break;
+      case 'close-chore-form':
+        state.choreFormOpen = false;
+        render();
+        break;
+      case 'pick-chore-icon':
+        state.choreDraft.icon = btn.dataset.icon;
+        render();
+        break;
+      case 'clear-chore-icon':
+        state.choreDraft.icon = '';
+        render();
+        break;
+      case 'delete-chore': {
+        const choreName = btn.dataset.name || 'この家事';
+        if (!confirm(choreName + ' を削除しますか？')) return;
+        mutate('deleteChore', { id }, (d) => {
+          d.chores = d.chores.filter((x) => x.id !== id);
+        });
+        break;
+      }
+      case 'open-member-form':
+        state.memberFormOpen = true;
+        render();
+        document.querySelector('#member-form input[name="name"]')?.focus();
+        break;
+      case 'close-member-form':
+        state.memberFormOpen = false;
+        render();
+        break;
+      case 'pick-member-icon':
+        state.memberDraft.icon = btn.dataset.icon;
+        render();
+        break;
+      case 'toggle-track-home': {
+        const name = btn.dataset.name;
+        const trackHome = btn.dataset.track === 'true';
+        mutate('setMemberTrackHome', { name, trackHome }, (d) => {
+          const m = d.members.find((x) => x.name === name);
+          if (m) m.trackHome = trackHome;
+        });
+        break;
+      }
+      case 'delete-member': {
+        const name = btn.dataset.name;
+        if (!confirm(name + ' を削除しますか？')) return;
+        mutate('deleteMember', { name }, (d) => {
+          d.members = d.members.filter((x) => x.name !== name);
+        });
+        break;
+      }
       case 'home-status':
         state.homeDraft.status = btn.dataset.value;
         render();
@@ -516,6 +742,43 @@
     }
 
     if (submit) submit.disabled = true;
+
+    if (form.id === 'chore-form') {
+      const name = String(fd.get('name') || '').trim();
+      if (!name) {
+        toast('家事の名前を入力してください');
+        if (submit) submit.disabled = false;
+        return;
+      }
+      const icon = state.choreDraft.icon || '';
+      const ok = await mutate('addChore', { name, icon });
+      if (ok) {
+        state.choreDraft = { ...EMPTY_CHORE };
+        state.choreFormOpen = false;
+        render();
+        toast('家事を追加しました');
+      }
+      return;
+    }
+
+    if (form.id === 'member-form') {
+      const name = String(fd.get('name') || '').trim();
+      if (!name) {
+        toast('名前を入力してください');
+        if (submit) submit.disabled = false;
+        return;
+      }
+      const icon = state.memberDraft.icon || '👤';
+      const trackHome = fd.get('trackHome') === 'on';
+      const ok = await mutate('addMember', { name, icon, trackHome });
+      if (ok) {
+        state.memberDraft = { ...EMPTY_MEMBER };
+        state.memberFormOpen = false;
+        render();
+        toast('家族を追加しました');
+      }
+      return;
+    }
 
     if (form.id === 'errand-form') {
       const title = String(fd.get('title') || '').trim();
@@ -554,9 +817,10 @@
 
     if (form.id === 'home-form') {
       const f = state.homeDraft;
-      const payload = { member: state.me, status: f.status, eta: f.eta, dinner: f.dinner, note: f.note.trim() };
+      const targetMember = f._member || state.homeTargetMember || state.me;
+      const payload = { member: targetMember, status: f.status, eta: f.eta, dinner: f.dinner, note: f.note.trim() };
       const ok = await mutate('setHomeStatus', payload, (d) => {
-        const h = d.home.find((x) => x.member === state.me);
+        const h = d.home.find((x) => x.member === targetMember);
         if (h) Object.assign(h, payload, { timestamp: new Date().toISOString() });
       });
       if (ok) {
@@ -571,7 +835,16 @@
   $app.addEventListener('input', (ev) => {
     const el = ev.target;
     const form = el.form;
-    if (!form || !el.name) return;
+    if (!form) return;
+    if (form.id === 'chore-form') {
+      if (el.id === 'chore-custom-icon') state.choreDraft.icon = el.value;
+      else if (el.name) state.choreDraft[el.name] = el.value;
+    }
+    if (form.id === 'member-form') {
+      if (el.id === 'member-custom-icon') state.memberDraft.icon = el.value;
+      else if (el.name) state.memberDraft[el.name] = el.value;
+    }
+    if (!el.name) return;
     if (form.id === 'errand-form') state.errandDraft[el.name] = el.value;
     if (form.id === 'home-form' && state.homeDraft) state.homeDraft[el.name] = el.value;
   });

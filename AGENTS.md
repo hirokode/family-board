@@ -5,11 +5,12 @@
 
 ## アプリの概要
 
-家族で使うスマホ向けWebアプリ。できることは3つ。
+家族で使うスマホ向けWebアプリ。できることは主に4つ。
 
-- 家事：その日の家事をタップで完了／未完了に切り替える（日付が変わると自動でリセット）
+- 家事：その日の家事をタップで完了／未完了に切り替える（日付が変わると自動でリセット）。設定画面から項目の追加（アイコン自由設定）・削除が可能
 - おつかい：頼みたい買い物を、買うもの・予算・メモつきで登録。品目ごとに「買った」をチェック、完了時に使った金額を記録
-- 帰宅：兄の帰宅状況（会社／帰宅中／帰宅済み など）、到着予定、夕飯の要否を家族に共有
+- 帰宅：家族各人の帰宅状況（会社／帰宅中／帰宅済み など）、到着予定、夕飯の要否を共有
+- 設定：家事項目の追加・削除、家族メンバーの追加・帰宅カードの表示ON/OFF切り替え
 
 ## 構成
 
@@ -61,12 +62,17 @@
 |---|---|---|
 | bootstrap | なし | 今日の家事、おつかい、帰宅状況、家族一覧をまとめて返す |
 | toggleChore | choreId, done, by | 今日の家事の完了を切り替える |
+| addChore | name, icon | 家事の項目を追加する（アイコンなしも可） |
+| deleteChore | id | 家事の項目を削除する |
 | addErrand | title, items[], budget, memo, by | おつかいを追加 |
 | toggleErrandItem | id, index | 品目の「買った」を切り替える |
 | completeErrand | id, spent | おつかいを完了にする |
 | reopenErrand | id | 完了を取り消す |
 | deleteErrand | id | おつかいを削除 |
 | setHomeStatus | member, status, eta, dinner, note | 帰宅状況を更新（trackHome=TRUE の人のみ） |
+| setMemberTrackHome | name, trackHome | 帰宅カードの表示ON/OFFを切り替える |
+| addMember | name, icon, trackHome | 家族メンバーを追加する |
+| deleteMember | name | 家族メンバーを削除する |
 
 合言葉が違うときは `{ ok: false, error: "AUTH" }` を返し、フロントは合言葉の入力画面に戻る。
 

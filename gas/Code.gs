@@ -30,6 +30,7 @@ const SHEETS = {
 const SEED = {
   Members: [
     ['兄', '🧑', true],
+    ['弟', '👦', true],
     ['家族A', '👩', false],
     ['家族B', '👨', false],
   ],
@@ -48,12 +49,17 @@ const SEED = {
 const ACTIONS = {
   bootstrap: function () { return bootstrap_(); },
   toggleChore: toggleChore_,
+  addChore: addChore_,
+  deleteChore: deleteChore_,
   addErrand: addErrand_,
   toggleErrandItem: toggleErrandItem_,
   completeErrand: completeErrand_,
   reopenErrand: reopenErrand_,
   deleteErrand: deleteErrand_,
   setHomeStatus: setHomeStatus_,
+  setMemberTrackHome: setMemberTrackHome_,
+  addMember: addMember_,
+  deleteMember: deleteMember_,
 };
 
 /* ========== 入口 ========== */
@@ -128,6 +134,34 @@ function toggleChore_(req) {
     const sh = sheet_(SHEETS.choreLog);
     if (hit) sh.getRange(hit._row, 1, 1, row.length).setValues([row]);
     else sh.appendRow(row);
+  });
+  return bootstrap_();
+}
+
+function addChore_(req) {
+  const name = text_(req.name, 40);
+  if (!name) throw new Error('家事の名前を入力してください');
+  const icon = text_(req.icon, 10);
+  withLock_(function () {
+    const rows = readRows_(SHEETS.chores);
+    let maxOrder = 0;
+    rows.forEach(function (r) {
+      const ord = Number(r.order) || 0;
+      if (ord > maxOrder) maxOrder = ord;
+    });
+    const id = 'c' + Utilities.getUuid().replace(/-/g, '').slice(0, 8);
+    sheet_(SHEETS.chores).appendRow([id, cell_(name), cell_(icon), maxOrder + 1, true]);
+  });
+  return bootstrap_();
+}
+
+function deleteChore_(req) {
+  const choreId = text_(req.id || req.choreId, 40);
+  if (!choreId) throw new Error('削除する家事が指定されていません');
+  withLock_(function () {
+    const hit = readRows_(SHEETS.chores).filter(function (r) { return String(r.id) === choreId; })[0];
+    if (!hit) throw new Error('家事が見つかりませんでした');
+    sheet_(SHEETS.chores).deleteRow(hit._row);
   });
   return bootstrap_();
 }
@@ -208,6 +242,49 @@ function setHomeStatus_(req) {
   const dinner = DINNER_OPTIONS.indexOf(req.dinner) >= 0 ? req.dinner : '未定';
   withLock_(function () {
     sheet_(SHEETS.home).appendRow([new Date(), member, cell_(status), eta, dinner, cell_(text_(req.note, 60))]);
+  });
+  return bootstrap_();
+}
+
+function setMemberTrackHome_(req) {
+  const memberName = text_(req.name, 20);
+  if (!memberName) throw new Error('メンバー名が指定されていません');
+  const track = req.trackHome === true;
+  withLock_(function () {
+    const hit = readRows_(SHEETS.members).filter(function (r) {
+      return String(r.name).trim() === memberName;
+    })[0];
+    if (!hit) throw new Error('メンバーが見つかりませんでした');
+    // Membersシートの列は name(1), icon(2), trackHome(3)
+    sheet_(SHEETS.members).getRange(hit._row, 3).setValue(track);
+  });
+  return bootstrap_();
+}
+
+function addMember_(req) {
+  const name = text_(req.name, 20);
+  if (!name) throw new Error('名前を入力してください');
+  const icon = text_(req.icon, 10) || '👤';
+  const track = req.trackHome === true;
+  withLock_(function () {
+    const exists = readRows_(SHEETS.members).some(function (r) {
+      return String(r.name).trim() === name;
+    });
+    if (exists) throw new Error('同じ名前の家族がすでに登録されています');
+    sheet_(SHEETS.members).appendRow([cell_(name), cell_(icon), track]);
+  });
+  return bootstrap_();
+}
+
+function deleteMember_(req) {
+  const name = text_(req.name, 20);
+  if (!name) throw new Error('削除するメンバーを指定してください');
+  withLock_(function () {
+    const hit = readRows_(SHEETS.members).filter(function (r) {
+      return String(r.name).trim() === name;
+    })[0];
+    if (!hit) throw new Error('メンバーが見つかりませんでした');
+    sheet_(SHEETS.members).deleteRow(hit._row);
   });
   return bootstrap_();
 }
