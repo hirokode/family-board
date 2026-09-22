@@ -89,12 +89,44 @@ h2 { margin: 0; font-size: 1.125rem; font-weight: 700; }
 
 /* ---------- ヘッダー ---------- */
 .top-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
+.date-sync-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .date {
   margin: 0;
   font-size: 1.35rem;
   font-weight: 800;
   line-height: 1.25;
   letter-spacing: -0.01em;
+}
+.sync-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(39, 88, 201, 0.12);
+  color: var(--blue);
+  font-size: .75rem;
+  font-weight: 700;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.85);
+  transition: opacity .2s ease, transform .2s ease;
+}
+.sync-indicator.is-syncing {
+  opacity: 1;
+  transform: scale(1);
+  pointer-events: auto;
+}
+.sync-spinner {
+  animation: spin 0.75s linear infinite;
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
 .brand-sub {
   margin: 2px 0 0;
@@ -301,8 +333,27 @@ h2 { margin: 0; font-size: 1.125rem; font-weight: 700; }
   background: var(--paper);
 }
 .note-title { margin: 0; font-size: 1.0625rem; font-weight: 700; }
-.errand-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
-.budget { flex: none; margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.errand-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.errand-head-right { display: flex; align-items: center; gap: 8px; flex: none; }
+.btn-edit {
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--muted);
+  font-size: .75rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.btn-edit:active {
+  background: var(--line);
+}
+.errand-edit-form {
+  border: 2px solid var(--blue);
+  box-shadow: 0 4px 14px rgba(39, 88, 201, 0.15);
+}
+.budget { flex: none; margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; font-size: .875rem; }
 .errand-meta { margin: 2px 0 0; font-size: .75rem; color: var(--muted); }
 .items-count { margin: 12px 0 6px; font-size: .75rem; color: var(--muted); }
 .items { list-style: none; display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; padding: 0; }

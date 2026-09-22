@@ -52,6 +52,7 @@ const ACTIONS = {
   addChore: addChore_,
   deleteChore: deleteChore_,
   addErrand: addErrand_,
+  updateErrand: updateErrand_,
   toggleErrandItem: toggleErrandItem_,
   completeErrand: completeErrand_,
   reopenErrand: reopenErrand_,
@@ -217,6 +218,41 @@ function addErrand_(req) {
       '',
     ]);
   });
+  return bootstrap_();
+}
+
+function updateErrand_(req) {
+  const id = text_(req.id, 40);
+  if (!id) throw new Error('おつかいが指定されていません');
+  const title = text_(req.title, 40);
+  if (!title) throw new Error('何を頼むか入力してください');
+
+  withLock_(function () {
+    const e = findErrand_(id);
+    const existingItems = items_(e.itemsJson);
+
+    const newNames = (Array.isArray(req.items) ? req.items : [])
+      .map(function (s) { return text_(s, 40); })
+      .filter(Boolean)
+      .slice(0, 50);
+
+    const updatedItems = newNames.map(function (name) {
+      const match = existingItems.filter(function (it) { return it.name === name; })[0];
+      return { name: name, done: match ? match.done : false };
+    });
+
+    const budget = num_(req.budget);
+    const memo = text_(req.memo, 100);
+
+    const sh = sheet_(SHEETS.errands);
+    sh.getRange(e._row, 3, 1, 4).setValues([[
+      cell_(title),
+      JSON.stringify(updatedItems),
+      budget === null ? '' : Math.max(0, Math.round(budget)),
+      cell_(memo)
+    ]]);
+  });
+
   return bootstrap_();
 }
 

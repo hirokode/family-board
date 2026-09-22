@@ -34,6 +34,7 @@
   const EMPTY_ERRAND = { title: '', items: '', budget: '', memo: '' };
   const EMPTY_CHORE = { name: '', icon: '🧹' };
   const EMPTY_MEMBER = { name: '', icon: '👦', trackHome: true };
+  const EMPTY_EDIT_ERRAND = { id: '', title: '', items: '', budget: '', memo: '' };
 
   const state = {
     passcode: load(LS.pass),
@@ -41,8 +42,11 @@
     tab: 'chores', // 初期画面はホーム画面
     data: null,
     error: '',
+    syncingCount: 0, // バックグラウンド同期中カウント
     errandFormOpen: false,
     errandDraft: { ...EMPTY_ERRAND },
+    editingErrandId: null, // 編集中の依頼ID
+    editErrandDraft: { ...EMPTY_EDIT_ERRAND },
     homeDraft: null,
     choreFormOpen: false,
     choreDraft: { ...EMPTY_CHORE },
@@ -148,7 +152,7 @@
   }
 
   async function refresh(silent) {
-    if (!state.passcode) return;
+    if (!state.passcode || state.syncingCount > 0) return;
     try {
       const data = await api('bootstrap');
       state.data = data;
@@ -170,27 +174,36 @@
     }
   }
 
-  // 画面を先に変えて（楽観的更新）、サーバーの結果で上書きする。失敗したら元に戻す。
-  async function mutate(action, payload, optimistic) {
+  // 画面を先に変えて即時反映（楽観的更新）。スプシの上書きはバックグラウンドでゆっくり追いつかせる。
+  function mutate(action, payload, optimistic) {
     const before = structuredClone(state.data);
-    if (optimistic) {
+    if (optimistic && state.data) {
       optimistic(state.data);
       render();
     }
-    try {
-      state.data = await api(action, { by: state.me, ...payload });
-      render();
-      return true;
-    } catch (e) {
-      state.data = before;
-      if (e.name === 'AuthError') {
-        logout('合言葉を入力し直してください');
+    state.syncingCount++;
+    render();
+
+    return api(action, { by: state.me, ...payload })
+      .then((data) => {
+        state.syncingCount = Math.max(0, state.syncingCount - 1);
+        if (state.syncingCount === 0 && data) {
+          state.data = data;
+        }
+        render();
+        return true;
+      })
+      .catch((e) => {
+        state.syncingCount = Math.max(0, state.syncingCount - 1);
+        if (e.name === 'AuthError') {
+          logout('合言葉を入力し直してください');
+          return false;
+        }
+        state.data = before;
+        render();
+        toast(e.message || '保存に失敗しました');
         return false;
-      }
-      render();
-      toast(e.message);
-      return false;
-    }
+      });
   }
 
   /* ---------- 画面 ---------- */
@@ -258,7 +271,15 @@
       <header class="top">
         <div class="top-row">
           <div>
-            <h1 class="date">${esc(dateLabel(d.today))}</h1>
+            <div class="date-sync-row">
+              <h1 class="date">${esc(dateLabel(d.today))}</h1>
+              <div class="sync-indicator ${state.syncingCount > 0 ? 'is-syncing' : ''}" title="${state.syncingCount > 0 ? 'スプレッドシートと同期中' : '同期完了'}" aria-live="polite">
+                <svg class="sync-spinner" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5">
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" stroke-linecap="round"></path>
+                </svg>
+                <span class="sync-text">同期中</span>
+              </div>
+            </div>
             <p class="brand-sub">家族ボード</p>
           </div>
           <button class="me" data-act="switch-me" aria-label="使う人を切り替える（いま：${esc(me.name)}）">
@@ -393,12 +414,31 @@
   }
 
   function errandCard(e) {
+    if (state.editingErrandId === e.id) {
+      const f = state.editErrandDraft;
+      return `
+        <form class="note errand-edit-form" id="errand-edit-form" data-id="${esc(e.id)}" autocomplete="off">
+          <h4 class="note-title">おつかいの内容を編集</h4>
+          <label>何を頼む？<input name="title" required maxlength="40" value="${esc(f.title)}" placeholder="例：夕飯の買い出し"></label>
+          <label>買うもの（1行に1つ）<textarea name="items" rows="4" placeholder="例：たまご&#10;牛乳&#10;玉ねぎ 2個">${esc(f.items)}</textarea></label>
+          <label>予算（円・任意）<input name="budget" type="number" inputmode="numeric" min="0" value="${esc(f.budget)}" placeholder="例：2000"></label>
+          <label>メモ（任意）<input name="memo" maxlength="100" value="${esc(f.memo)}" placeholder="例：18時までにお願い"></label>
+          <div class="actions">
+            <button type="button" class="btn" data-act="close-errand-edit">キャンセル</button>
+            <button type="submit" class="btn primary">保存する</button>
+          </div>
+        </form>`;
+    }
+
     const bought = e.items.filter((i) => i.done).length;
     return `
       <article class="note errand">
         <div class="errand-head">
           <h4 class="note-title">${esc(e.title)}</h4>
-          ${e.budget !== null ? `<p class="budget">予算 ${yen(e.budget)}</p>` : ''}
+          <div class="errand-head-right">
+            ${e.budget !== null ? `<span class="budget">予算 ${yen(e.budget)}</span>` : ''}
+            <button type="button" class="btn-edit" data-act="open-errand-edit" data-id="${esc(e.id)}" aria-label="このおつかいを編集">✏️ 編集</button>
+          </div>
         </div>
         <p class="errand-meta">${e.requestedBy ? esc(e.requestedBy) + 'が' : ''}${esc(fmtDateTime(e.createdAt))}に起票</p>
         ${e.items.length ? `
@@ -714,8 +754,33 @@
           d.errands.open = d.errands.open.filter((x) => x.id !== id);
         });
         break;
+      case 'open-errand-edit': {
+        const target = state.data.errands.open.find((x) => x.id === id);
+        if (!target) return;
+        state.editingErrandId = id;
+        state.editErrandDraft = {
+          id,
+          title: target.title || '',
+          items: (target.items || []).map((it) => it.name).join('\n'),
+          budget: target.budget !== null && target.budget !== undefined ? target.budget : '',
+          memo: target.memo || '',
+        };
+        render();
+        document.querySelector('#errand-edit-form input[name="title"]')?.focus();
+        break;
+      }
+      case 'close-errand-edit':
+        state.editingErrandId = null;
+        render();
+        break;
       case 'reopen-errand':
-        mutate('reopenErrand', { id });
+        mutate('reopenErrand', { id }, (d) => {
+          const target = d.errands.done.find((x) => x.id === id);
+          if (target) {
+            d.errands.done = d.errands.done.filter((x) => x.id !== id);
+            d.errands.open.unshift({ ...target, status: 'open', spent: null, completedAt: '' });
+          }
+        });
         break;
       case 'pick-home-target':
         state.homeTargetMember = btn.dataset.member;
@@ -800,23 +865,31 @@
       return;
     }
 
-    if (submit) submit.disabled = true;
+    if (submit) submit.disabled = false;
 
     if (form.id === 'chore-form') {
       const name = String(fd.get('name') || '').trim();
       if (!name) {
         toast('家事の名前を入力してください');
-        if (submit) submit.disabled = false;
         return;
       }
       const icon = state.choreDraft.icon || '';
-      const ok = await mutate('addChore', { name, icon });
-      if (ok) {
-        state.choreDraft = { ...EMPTY_CHORE };
-        state.choreFormOpen = false;
-        render();
-        toast('家事を追加しました');
-      }
+      const tempId = 'temp_c_' + Date.now();
+      mutate('addChore', { name, icon }, (d) => {
+        d.chores.push({
+          id: tempId,
+          name,
+          icon,
+          order: d.chores.length + 1,
+          done: false,
+          by: '',
+          updatedAt: '',
+        });
+      });
+      state.choreDraft = { ...EMPTY_CHORE };
+      state.choreFormOpen = false;
+      render();
+      toast('家事を追加しました');
       return;
     }
 
@@ -824,18 +897,17 @@
       const name = String(fd.get('name') || '').trim();
       if (!name) {
         toast('名前を入力してください');
-        if (submit) submit.disabled = false;
         return;
       }
       const icon = state.memberDraft.icon || '👤';
       const trackHome = fd.get('trackHome') === 'on';
-      const ok = await mutate('addMember', { name, icon, trackHome });
-      if (ok) {
-        state.memberDraft = { ...EMPTY_MEMBER };
-        state.memberFormOpen = false;
-        render();
-        toast('家族を追加しました');
-      }
+      mutate('addMember', { name, icon, trackHome }, (d) => {
+        d.members.push({ name, icon, trackHome });
+      });
+      state.memberDraft = { ...EMPTY_MEMBER };
+      state.memberFormOpen = false;
+      render();
+      toast('家族を追加しました');
       return;
     }
 
@@ -843,34 +915,70 @@
       const title = String(fd.get('title') || '').trim();
       if (!title) {
         toast('何を頼むか入力してください');
-        if (submit) submit.disabled = false;
         return;
       }
-      const ok = await mutate('addErrand', {
-        title,
-        items: String(fd.get('items') || '').split('\n').map((s) => s.trim()).filter(Boolean),
-        budget: fd.get('budget') === '' ? null : Number(fd.get('budget')),
-        memo: String(fd.get('memo') || '').trim(),
+      const rawItems = String(fd.get('items') || '').split('\n').map((s) => s.trim()).filter(Boolean);
+      const budget = fd.get('budget') === '' ? null : Number(fd.get('budget'));
+      const memo = String(fd.get('memo') || '').trim();
+      const tempId = 'temp_e_' + Date.now();
+      mutate('addErrand', { title, items: rawItems, budget, memo }, (d) => {
+        d.errands.open.unshift({
+          id: tempId,
+          title,
+          items: rawItems.map((name) => ({ name, done: false })),
+          budget,
+          memo,
+          requestedBy: state.me,
+          status: 'open',
+          createdAt: new Date().toISOString(),
+        });
       });
-      if (ok) {
-        state.errandDraft = { ...EMPTY_ERRAND };
-        state.errandFormOpen = false;
-        render();
-        toast('おつかいを頼みました');
+      state.errandDraft = { ...EMPTY_ERRAND };
+      state.errandFormOpen = false;
+      render();
+      toast('おつかいを頼みました');
+      return;
+    }
+
+    if (form.id === 'errand-edit-form') {
+      const id = form.dataset.id;
+      const title = String(fd.get('title') || '').trim();
+      if (!title) {
+        toast('何を頼むか入力してください');
+        return;
       }
+      const rawItems = String(fd.get('items') || '').split('\n').map((s) => s.trim()).filter(Boolean);
+      const budget = fd.get('budget') === '' ? null : Number(fd.get('budget'));
+      const memo = String(fd.get('memo') || '').trim();
+      mutate('updateErrand', { id, title, items: rawItems, budget, memo }, (d) => {
+        const target = d.errands.open.find((x) => x.id === id);
+        if (target) {
+          const oldItems = target.items || [];
+          target.title = title;
+          target.items = rawItems.map((name) => {
+            const match = oldItems.find((it) => it.name === name);
+            return { name, done: match ? match.done : false };
+          });
+          target.budget = budget;
+          target.memo = memo;
+        }
+      });
+      state.editingErrandId = null;
+      render();
+      toast('おつかいを更新しました');
       return;
     }
 
     if (form.classList.contains('complete')) {
       const id = form.dataset.id;
       const spent = fd.get('spent') === '' ? null : Number(fd.get('spent'));
-      const ok = await mutate('completeErrand', { id, spent }, (d) => {
+      mutate('completeErrand', { id, spent }, (d) => {
         const e = d.errands.open.find((x) => x.id === id);
         if (!e) return;
         d.errands.open = d.errands.open.filter((x) => x.id !== id);
         d.errands.done.unshift({ ...e, status: 'done', spent, completedAt: new Date().toISOString() });
       });
-      if (ok) toast('おつかいを完了にしました');
+      toast('おつかいを完了にしました');
       return;
     }
 
@@ -878,15 +986,13 @@
       const f = state.homeDraft;
       const targetMember = state.me;
       const payload = { member: targetMember, status: f.status, eta: f.eta, dinner: f.dinner, note: f.note.trim() };
-      const ok = await mutate('setHomeStatus', payload, (d) => {
+      mutate('setHomeStatus', payload, (d) => {
         const h = d.home.find((x) => x.member === targetMember);
         if (h) Object.assign(h, payload, { timestamp: new Date().toISOString() });
       });
-      if (ok) {
-        state.homeDraft = null;
-        render();
-        toast('保存しました');
-      }
+      state.homeDraft = null;
+      render();
+      toast('保存しました');
     }
   });
 
@@ -905,6 +1011,7 @@
     }
     if (!el.name) return;
     if (form.id === 'errand-form') state.errandDraft[el.name] = el.value;
+    if (form.id === 'errand-edit-form') state.editErrandDraft[el.name] = el.value;
     if (form.id === 'home-form' && state.homeDraft) {
       state.homeDraft[el.name] = el.value;
       if (el.name === 'eta') {
