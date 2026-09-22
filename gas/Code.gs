@@ -379,13 +379,14 @@ function errands_() {
 }
 
 function homeFor_(members) {
+  const today = today_();
   const tracked = members.filter(function (m) { return m.trackHome; }).map(function (m) { return m.name; });
   if (!tracked.length) return [];
   const rows = readRows_(SHEETS.home);
   return tracked.map(function (name) {
     for (let i = rows.length - 1; i >= 0; i--) {
       const r = rows[i];
-      if (String(r.member) === name) {
+      if (String(r.member) === name && dateKey_(r.timestamp) === today) {
         return {
           member: name,
           status: String(r.status || ''),

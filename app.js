@@ -3,11 +3,20 @@
 
   const CFG = window.APP_CONFIG || {};
   const LS = { pass: 'familyBoard.passcode', me: 'familyBoard.me', tab: 'familyBoard.tab' };
+
+  // シンプルなラインSVGアイコン（絵文字の安っぽさを解消）
+  const ICONS = {
+    home: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>`,
+    errands: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>`,
+    returnHome: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s-8-4.5-8-11.8A8 8 0 0 1 12 2a8 8 0 0 1 8 8.2c0 7.3-8 11.8-8 11.8z"></path><circle cx="12" cy="10" r="3"></circle></svg>`,
+    settings: `<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`,
+  };
+
   const TABS = [
-    { key: 'chores', label: '家事', icon: '🧹' },
-    { key: 'errands', label: 'おつかい', icon: '🛒' },
-    { key: 'home', label: '帰宅', icon: '🏠' },
-    { key: 'settings', label: '設定', icon: '⚙️' },
+    { key: 'chores', label: 'ホーム', iconSvg: ICONS.home },
+    { key: 'errands', label: 'おつかい', iconSvg: ICONS.errands },
+    { key: 'home', label: '帰宅', iconSvg: ICONS.returnHome },
+    { key: 'settings', label: '設定', iconSvg: ICONS.settings },
   ];
   // tone: 画面上の色分け（home=黄、coming=青、out=白）
   const HOME_STATUSES = [
@@ -16,6 +25,7 @@
     { key: '帰宅済み', emoji: '🏠', tone: 'home' },
     { key: '外出中', emoji: '🚶', tone: 'out' },
     { key: '遅くなる', emoji: '🌙', tone: 'out' },
+    { key: '帰らない', emoji: '泊', tone: 'out' },
   ];
   const DINNER = ['いる', 'いらない', '未定'];
   const CHORE_ICONS = ['🧹', '🧺', '🍳', '👕', '🛁', '🗑️', '🍽️', '🛒', '🐕', '🪴', '📦', '🛏️', '🪟', '🧴', '🌸'];
@@ -28,13 +38,12 @@
   const state = {
     passcode: load(LS.pass),
     me: load(LS.me),
-    tab: TABS.some((t) => t.key === load(LS.tab)) ? load(LS.tab) : 'chores',
+    tab: 'chores', // 初期画面はホーム画面
     data: null,
     error: '',
     errandFormOpen: false,
     errandDraft: { ...EMPTY_ERRAND },
     homeDraft: null,
-    homeTargetMember: '',
     choreFormOpen: false,
     choreDraft: { ...EMPTY_CHORE },
     memberFormOpen: false,
@@ -260,32 +269,39 @@
       <main class="panel">${body}</main>
       <nav class="tabs" aria-label="画面の切り替え">${TABS.map((t) => `
         <button class="tab" data-act="tab" data-tab="${t.key}" ${state.tab === t.key ? 'aria-current="page"' : ''}>
-          <span class="tab-icon" aria-hidden="true">${t.icon}</span>${t.label}
+          <span class="tab-icon" aria-hidden="true">${t.iconSvg}</span>
+          <span class="tab-label">${t.label}</span>
         </button>`).join('')}
       </nav>`;
   }
 
-  // 上部の「マグネット」：帰宅状況のひと目表示（タップで帰宅タブへ）
+  // 上部の家族ボード：[名前ボックス] と [状態ボックス] の2分割構成
   function homeMagnets() {
     return state.data.home.map((h) => {
-      if (!h.status) {
-        return `
-          <button class="home-magnet" data-tone="none" data-act="tab" data-tab="home">
-            <span class="home-emoji" aria-hidden="true">❔</span>
-            <span class="home-text"><span class="home-line">${esc(h.member)}の帰宅状況はまだありません</span></span>
-          </button>`;
-      }
+      const memberObj = state.data.members.find((m) => m.name === h.member);
+      const memberIcon = (memberObj && memberObj.icon) || '👤';
       const st = statusOf(h.status);
-      const sub = [h.eta && `${h.eta}ごろ着`, h.dinner && `夕飯${h.dinner}`, `${ago(h.timestamp)}に更新`]
-        .filter(Boolean).join('、');
+      const sub = [h.eta && `${h.eta}着`, h.dinner && `夕飯${h.dinner}`, h.timestamp && ago(h.timestamp)]
+        .filter(Boolean).join('・');
+
       return `
-        <button class="home-magnet" data-tone="${st ? st.tone : 'out'}" data-act="tab" data-tab="home">
-          <span class="home-emoji" aria-hidden="true">${st ? st.emoji : '📍'}</span>
-          <span class="home-text">
-            <span class="home-line">${esc(h.member)}は${esc(h.status)}</span>
-            <span class="home-sub">${esc(sub)}</span>
-          </span>
-        </button>`;
+        <div class="home-card-row" data-act="tab" data-tab="home" role="button" tabindex="0">
+          <div class="member-box">
+            <span class="member-box-icon">${esc(memberIcon)}</span>
+            <span class="member-box-name">${esc(h.member)}</span>
+          </div>
+          <div class="status-box" data-tone="${h.status ? (st ? st.tone : 'out') : 'none'}">
+            ${h.status ? `
+              <div class="status-box-main">
+                <span class="status-box-emoji">${st ? st.emoji : '📍'}</span>
+                <span class="status-box-text">${esc(h.status)}</span>
+              </div>
+              ${sub ? `<span class="status-box-sub">${esc(sub)}</span>` : ''}
+            ` : `
+              <div class="status-box-empty">今日の状況はまだありません</div>
+            `}
+          </div>
+        </div>`;
     }).join('');
   }
 
@@ -311,7 +327,7 @@
                 <span class="chore-name">${esc(c.name)}</span>
                 ${c.done ? `<span class="chore-meta">${c.by ? esc(c.by) + 'が' : ''}${esc(fmtTime(c.updatedAt))}に完了</span>` : ''}
               </span>
-              <span class="dot" aria-hidden="true"></span>
+              <span class="dot" aria-hidden="true">${c.done ? esc(c.by ? c.by.slice(0, 3) : '済') : ''}</span>
             </button>
           </li>`).join('')}</ul>`
         : '<p class="empty">家事の項目がありません。「設定」タブから家事を追加してください。</p>'}
@@ -391,54 +407,49 @@
         </section>`;
     }
 
-    if (!state.homeTargetMember || !tracked.some((h) => h.member === state.homeTargetMember)) {
-      const myTracked = tracked.find((h) => h.member === state.me);
-      state.homeTargetMember = myTracked ? myTracked.member : tracked[0].member;
-    }
-    const targetMember = state.homeTargetMember;
-    const currentStatus = tracked.find((h) => h.member === targetMember);
-
-    if (!state.homeDraft || state.homeDraft._member !== targetMember) {
+    const mine = tracked.find((h) => h.member === state.me);
+    if (mine && (!state.homeDraft || state.homeDraft._member !== state.me)) {
       state.homeDraft = {
-        _member: targetMember,
-        status: currentStatus ? (currentStatus.status || '') : '',
-        eta: currentStatus ? (currentStatus.eta || '') : '',
-        dinner: currentStatus ? (currentStatus.dinner || '未定') : '未定',
+        _member: state.me,
+        status: mine.status || '',
+        eta: mine.eta || '',
+        dinner: mine.dinner || '未定',
         note: '',
       };
     }
-    const f = state.homeDraft;
+    const f = state.homeDraft || { status: '', eta: '', dinner: '未定', note: '' };
 
     return `
       <section aria-labelledby="h-home">
         <h2 id="h-home">帰宅状況</h2>
         ${tracked.map(statusCard).join('')}
 
-        <form id="home-form" class="note">
-          <h3 class="note-title">${esc(targetMember)}の状況を家族に伝える</h3>
+        ${mine ? `
+          <form id="home-form" class="note">
+            <h3 class="note-title">今の状況を更新する（${esc(state.me)}）</h3>
 
-          ${tracked.length > 1 ? `
-            <p class="field-label">誰の状況？</p>
-            <div class="seg" role="group" aria-label="状況を伝える人">
-              ${tracked.map((h) => `
-                <button type="button" class="choice" data-act="pick-home-target" data-member="${esc(h.member)}" aria-pressed="${targetMember === h.member}">
-                  ${esc(h.member)}
-                </button>`).join('')}
-            </div>` : ''}
+            <div class="choices" role="group" aria-label="今の状況">${HOME_STATUSES.map((s) => `
+              <button type="button" class="choice" data-act="home-status" data-value="${s.key}" aria-pressed="${f.status === s.key}">
+                <span class="choice-emoji" aria-hidden="true">${s.emoji}</span>${s.key}
+              </button>`).join('')}
+            </div>
 
-          <div class="choices" role="group" aria-label="今の状況">${HOME_STATUSES.map((s) => `
-            <button type="button" class="choice" data-act="home-status" data-value="${s.key}" aria-pressed="${f.status === s.key}">
-              <span class="choice-emoji" aria-hidden="true">${s.emoji}</span>${s.key}
-            </button>`).join('')}
-          </div>
-          <label>到着予定（任意）<input name="eta" type="time" value="${esc(f.eta)}"></label>
-          <p class="field-label" id="dinner-label">夕飯</p>
-          <div class="seg" role="group" aria-labelledby="dinner-label">${DINNER.map((v) => `
-            <button type="button" class="choice" data-act="home-dinner" data-value="${v}" aria-pressed="${f.dinner === v}">${v}</button>`).join('')}
-          </div>
-          <label>ひとこと（任意）<input name="note" maxlength="60" value="${esc(f.note)}" placeholder="例：駅に着いたら連絡します"></label>
-          <button type="submit" class="btn primary wide" ${f.status ? '' : 'disabled'}>家族に伝える</button>
-        </form>
+            <label class="time-field-label">到着予定時刻（任意）
+              <div class="time-input-wrap">
+                <span class="time-icon" aria-hidden="true">🕒</span>
+                <input name="eta" type="time" class="time-input" value="${esc(f.eta)}">
+                <span class="time-hint ${f.eta ? 'is-hidden' : ''}">-- : --（タップして選択）</span>
+              </div>
+            </label>
+
+            <p class="field-label" id="dinner-label">夕飯</p>
+            <div class="seg" role="group" aria-labelledby="dinner-label">${DINNER.map((v) => `
+              <button type="button" class="choice" data-act="home-dinner" data-value="${v}" aria-pressed="${f.dinner === v}">${v}</button>`).join('')}
+            </div>
+            <label>ひとこと（任意）<input name="note" maxlength="60" value="${esc(f.note)}" placeholder="例：駅に着いたら連絡します"></label>
+            <button type="submit" class="btn primary wide" ${f.status ? '' : 'disabled'}>保存</button>
+          </form>`
+        : `<p class="hint">あなたの帰宅カードは現在「非表示」です。「設定」タブから帰宅カードを ON にすると状況を更新できます。</p>`}
       </section>`;
   }
 
@@ -817,7 +828,7 @@
 
     if (form.id === 'home-form') {
       const f = state.homeDraft;
-      const targetMember = f._member || state.homeTargetMember || state.me;
+      const targetMember = state.me;
       const payload = { member: targetMember, status: f.status, eta: f.eta, dinner: f.dinner, note: f.note.trim() };
       const ok = await mutate('setHomeStatus', payload, (d) => {
         const h = d.home.find((x) => x.member === targetMember);
@@ -826,7 +837,7 @@
       if (ok) {
         state.homeDraft = null;
         render();
-        toast('家族に伝えました');
+        toast('保存しました');
       }
     }
   });
@@ -846,7 +857,22 @@
     }
     if (!el.name) return;
     if (form.id === 'errand-form') state.errandDraft[el.name] = el.value;
-    if (form.id === 'home-form' && state.homeDraft) state.homeDraft[el.name] = el.value;
+    if (form.id === 'home-form' && state.homeDraft) {
+      state.homeDraft[el.name] = el.value;
+      if (el.name === 'eta') {
+        const hint = form.querySelector('.time-hint');
+        if (hint) hint.classList.toggle('is-hidden', !!el.value);
+      }
+    }
+  });
+
+  $app.addEventListener('change', (ev) => {
+    const el = ev.target;
+    if (el && el.name === 'eta' && el.form && el.form.id === 'home-form') {
+      if (state.homeDraft) state.homeDraft.eta = el.value;
+      const hint = el.form.querySelector('.time-hint');
+      if (hint) hint.classList.toggle('is-hidden', !!el.value);
+    }
   });
 
   $app.addEventListener('toggle', (ev) => {
