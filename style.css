@@ -10,10 +10,10 @@
   --yellow: #F4C430;    /* 黄色いマグネット（完了・在宅） */
   --yellow-ink: #2B2200;
   --red: #B3372F;
-  --radius-lg: 22px;
-  --radius: 14px;
-  --radius-sm: 10px;
-  --font: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic", system-ui, sans-serif;
+  --radius-lg: 18px;
+  --radius: 12px;
+  --radius-sm: 8px;
+  --font: -apple-system, BlinkMacSystemFont, "SF Pro JP", "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Yu Gothic", "Segoe UI", Roboto, sans-serif;
   color-scheme: light dark;
 }
 
@@ -89,8 +89,20 @@ h2 { margin: 0; font-size: 1.125rem; font-weight: 700; }
 
 /* ---------- ヘッダー ---------- */
 .top-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; }
-.date { margin: 0; font-size: .8125rem; color: var(--muted); }
-.brand { margin: 0; font-size: 1.375rem; font-weight: 900; letter-spacing: .02em; }
+.date {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 800;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+.brand-sub {
+  margin: 2px 0 0;
+  font-size: .8125rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.brand { margin: 0; font-size: 1.375rem; font-weight: 800; letter-spacing: .02em; }
 .me {
   flex: none;
   padding: 6px 14px;
@@ -127,7 +139,7 @@ h2 { margin: 0; font-size: 1.125rem; font-weight: 700; }
   border-radius: var(--radius);
   background: var(--paper);
   border: 1.5px solid var(--line);
-  box-shadow: 0 4px 0 var(--line);
+  box-shadow: 0 3px 0 var(--line);
 }
 .member-box-icon {
   font-size: 1.6rem;
@@ -135,7 +147,7 @@ h2 { margin: 0; font-size: 1.125rem; font-weight: 700; }
 }
 .member-box-name {
   font-size: .875rem;
-  font-weight: 900;
+  font-weight: 800;
   margin-top: 4px;
   white-space: nowrap;
   overflow: hidden;
@@ -143,29 +155,29 @@ h2 { margin: 0; font-size: 1.125rem; font-weight: 700; }
   max-width: 100%;
 }
 
-/* 右：状態ボックス（状態に応じて変化） */
+/* 右：状態ボックス（状態と夕飯を同列表示） */
 .status-box {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  padding: 12px 16px;
+  padding: 10px 14px;
   border-radius: var(--radius);
   background: var(--paper);
   color: var(--ink);
-  box-shadow: 0 4px 0 var(--line);
+  box-shadow: 0 3px 0 var(--line);
   transition: background .2s, color .2s, box-shadow .2s;
 }
 .status-box[data-tone="coming"] {
   background: var(--blue);
   color: var(--blue-ink);
-  box-shadow: 0 4px 0 rgba(0, 0, 0, .22);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, .22);
 }
 .status-box[data-tone="home"] {
   background: var(--yellow);
   color: var(--yellow-ink);
-  box-shadow: 0 4px 0 rgba(0, 0, 0, .18);
+  box-shadow: 0 3px 0 rgba(0, 0, 0, .18);
 }
 .status-box[data-tone="out"] {
   background: var(--paper);
@@ -178,27 +190,49 @@ h2 { margin: 0; font-size: 1.125rem; font-weight: 700; }
   box-shadow: none;
   color: var(--muted);
 }
-.status-box-main {
+.status-box-cols {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 1.25rem;
-  font-weight: 900;
-  line-height: 1.25;
+  gap: 10px;
 }
-.status-box-emoji {
-  font-size: 1.35rem;
-  line-height: 1;
+.status-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
-.status-box-text {
+.status-col-label {
+  font-size: .6875rem;
+  font-weight: 700;
+  opacity: .8;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, .07);
+  flex: none;
+}
+.status-box[data-tone="coming"] .status-col-label,
+.status-box[data-tone="home"] .status-col-label {
+  background: rgba(255, 255, 255, .25);
+}
+.status-col-val {
+  font-size: 1.0625rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.status-emoji {
+  font-size: 1.15rem;
+  line-height: 1;
+}
 .status-box-sub {
-  font-size: .8125rem;
+  font-size: .75rem;
   opacity: .85;
-  margin-top: 3px;
+  margin-top: 4px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -285,7 +319,60 @@ h2 { margin: 0; font-size: 1.125rem; font-weight: 700; }
   color: var(--yellow-ink);
   text-decoration: line-through;
 }
-.memo { margin: 0 0 12px; padding: 8px 12px; border-left: 3px solid var(--line); font-size: .9375rem; }
+/* 一言メモ（吹き出し・付箋風デザイン） */
+.memo-bubble {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 10px 0 14px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--line);
+}
+.memo-bubble-icon {
+  font-size: 1.15rem;
+  line-height: 1.2;
+  flex: none;
+}
+.memo-bubble-body {
+  flex: 1;
+  min-width: 0;
+}
+.memo-bubble-label {
+  display: block;
+  font-size: .6875rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: .02em;
+  margin-bottom: 2px;
+}
+.memo-bubble-text {
+  margin: 0;
+  font-size: .9375rem;
+  font-weight: 600;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* おつかい画面のセクション構成 */
+.errands-group {
+  margin-top: 24px;
+}
+.errands-section-title {
+  margin: 0 0 10px;
+  font-size: 1.0625rem;
+  font-weight: 800;
+  color: var(--ink);
+}
+.errands-family-section {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1.5px dashed var(--line);
+}
+.compact-board {
+  margin-top: 10px;
+}
 
 .complete { display: flex; align-items: flex-end; gap: 8px; }
 .complete label { flex: 1; margin: 0; }
@@ -300,19 +387,94 @@ h2 { margin: 0; font-size: 1.125rem; font-weight: 700; }
 /* ---------- 帰宅 ---------- */
 .status-card {
   margin-top: 12px;
-  padding: 18px;
+  padding: 16px 18px;
   border-radius: var(--radius-lg);
   background: var(--paper);
-  box-shadow: 0 5px 0 var(--line);
+  box-shadow: 0 4px 0 var(--line);
 }
-.status-card[data-tone="coming"] { background: var(--blue); color: var(--blue-ink); box-shadow: 0 5px 0 rgba(0, 0, 0, .22); }
-.status-card[data-tone="home"] { background: var(--yellow); color: var(--yellow-ink); box-shadow: 0 5px 0 rgba(0, 0, 0, .18); }
-.status-who { margin: 0; font-size: .875rem; font-weight: 700; opacity: .8; }
-.status-main { display: flex; align-items: center; gap: 10px; margin: 2px 0 10px; font-size: 1.75rem; font-weight: 900; }
+.status-card[data-tone="coming"] { background: var(--blue); color: var(--blue-ink); box-shadow: 0 4px 0 rgba(0, 0, 0, .22); }
+.status-card[data-tone="home"] { background: var(--yellow); color: var(--yellow-ink); box-shadow: 0 4px 0 rgba(0, 0, 0, .18); }
+.status-card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.status-card-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+.status-who {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 800;
+}
+.status-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.status-card-col {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  border: 1px solid var(--line);
+}
+.status-card[data-tone="coming"] .status-card-col {
+  background: rgba(255, 255, 255, .2);
+  border-color: rgba(255, 255, 255, .3);
+}
+.status-card[data-tone="home"] .status-card-col {
+  background: rgba(0, 0, 0, .06);
+  border-color: rgba(0, 0, 0, .1);
+}
+.status-card-label {
+  font-size: .6875rem;
+  font-weight: 700;
+  opacity: .8;
+}
+.status-card-val {
+  font-size: 1.125rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.status-bubble {
+  margin: 8px 0 12px;
+}
+.status-card[data-tone="coming"] .status-bubble {
+  background: rgba(255, 255, 255, .2);
+  border-color: rgba(255, 255, 255, .3);
+  color: inherit;
+}
+.status-card[data-tone="coming"] .status-bubble .memo-bubble-label {
+  color: rgba(255, 255, 255, .85);
+}
+.status-card[data-tone="home"] .status-bubble {
+  background: rgba(0, 0, 0, .06);
+  border-color: rgba(0, 0, 0, .1);
+  color: inherit;
+}
+.status-card[data-tone="home"] .status-bubble .memo-bubble-label {
+  color: rgba(0, 0, 0, .7);
+}
+.status-empty-text {
+  margin: 8px 0;
+  font-size: .9375rem;
+  color: var(--muted);
+}
 .status-list { display: grid; gap: 4px; margin: 0; }
 .status-list div { display: flex; gap: 12px; }
-.status-list dt { width: 5em; flex: none; opacity: .75; font-size: .875rem; }
-.status-list dd { margin: 0; font-weight: 700; }
+.status-list dt { width: 5em; flex: none; opacity: .75; font-size: .8125rem; }
+.status-list dd { margin: 0; font-weight: 700; font-size: .875rem; }
 
 .choices { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; margin: 12px 0 16px; }
 .choice {

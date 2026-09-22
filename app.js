@@ -25,7 +25,7 @@
     { key: '帰宅済み', emoji: '🏠', tone: 'home' },
     { key: '外出中', emoji: '🚶', tone: 'out' },
     { key: '遅くなる', emoji: '🌙', tone: 'out' },
-    { key: '帰らない', emoji: '泊', tone: 'out' },
+    { key: '帰らない', emoji: '🛌', tone: 'out' },
   ];
   const DINNER = ['いる', 'いらない', '未定'];
   const CHORE_ICONS = ['🧹', '🧺', '🍳', '👕', '🛁', '🗑️', '🍽️', '🛒', '🐕', '🪴', '📦', '🛏️', '🪟', '🧴', '🌸'];
@@ -71,13 +71,14 @@
   function fmtTime(iso) {
     return iso ? new Date(iso).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) : '';
   }
-  function ago(iso) {
+  function fmtDateTime(iso) {
     if (!iso) return '';
-    const min = (Date.now() - new Date(iso).getTime()) / 60000;
-    if (min < 1) return 'たった今';
-    if (min < 60) return Math.floor(min) + '分前';
-    if (min < 60 * 24) return Math.floor(min / 60) + '時間前';
-    return new Date(iso).toLocaleDateString('ja-JP', { month: 'numeric', day: 'numeric' });
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return '';
+    const m = d.getMonth() + 1;
+    const day = d.getDate();
+    const timeStr = d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' });
+    return `${m}/${day} ${timeStr}`;
   }
   function dateLabel(ymd) {
     return new Date(ymd + 'T00:00:00').toLocaleDateString('ja-JP', { month: 'long', day: 'numeric', weekday: 'short' });
@@ -257,14 +258,14 @@
       <header class="top">
         <div class="top-row">
           <div>
-            <p class="date">${esc(dateLabel(d.today))}</p>
-            <h1 class="brand">家族ボード</h1>
+            <h1 class="date">${esc(dateLabel(d.today))}</h1>
+            <p class="brand-sub">家族ボード</p>
           </div>
           <button class="me" data-act="switch-me" aria-label="使う人を切り替える（いま：${esc(me.name)}）">
             <span aria-hidden="true">${esc(me.icon)}</span> ${esc(me.name)}
           </button>
         </div>
-        ${state.tab !== 'home' && state.tab !== 'settings' ? `<div class="magnet-board">${homeMagnets()}</div>` : ''}
+        ${state.tab === 'chores' ? `<div class="magnet-board">${homeMagnets()}</div>` : ''}
       </header>
       <main class="panel">${body}</main>
       <nav class="tabs" aria-label="画面の切り替え">${TABS.map((t) => `
@@ -275,13 +276,13 @@
       </nav>`;
   }
 
-  // 上部の家族ボード：[名前ボックス] と [状態ボックス] の2分割構成
+  // 上部の家族ボード：[名前ボックス] と [状態ボックス] の2分割構成（状態と夕飯を同列表示）
   function homeMagnets() {
     return state.data.home.map((h) => {
       const memberObj = state.data.members.find((m) => m.name === h.member);
       const memberIcon = (memberObj && memberObj.icon) || '👤';
       const st = statusOf(h.status);
-      const sub = [h.eta && `${h.eta}着`, h.dinner && `夕飯${h.dinner}`, h.timestamp && ago(h.timestamp)]
+      const sub = [h.eta && `${h.eta}着`, h.timestamp && fmtDateTime(h.timestamp)]
         .filter(Boolean).join('・');
 
       return `
@@ -292,11 +293,17 @@
           </div>
           <div class="status-box" data-tone="${h.status ? (st ? st.tone : 'out') : 'none'}">
             ${h.status ? `
-              <div class="status-box-main">
-                <span class="status-box-emoji">${st ? st.emoji : '📍'}</span>
-                <span class="status-box-text">${esc(h.status)}</span>
+              <div class="status-box-cols">
+                <div class="status-col">
+                  <span class="status-col-label">状況</span>
+                  <span class="status-col-val"><span class="status-emoji" aria-hidden="true">${st ? st.emoji : '📍'}</span>${esc(h.status)}</span>
+                </div>
+                <div class="status-col">
+                  <span class="status-col-label">夕飯</span>
+                  <span class="status-col-val"><span class="status-emoji" aria-hidden="true">🍽️</span>${esc(h.dinner || '未定')}</span>
+                </div>
               </div>
-              ${sub ? `<span class="status-box-sub">${esc(sub)}</span>` : ''}
+              ${sub ? `<div class="status-box-sub">${esc(sub)}</div>` : ''}
             ` : `
               <div class="status-box-empty">今日の状況はまだありません</div>
             `}
@@ -350,7 +357,7 @@
           <button type="submit" class="btn primary">頼む</button>
         </div>
       </form>`
-      : '<button class="btn primary wide" data-act="open-errand-form">おつかいを頼む</button>';
+      : '<button class="btn primary wide" data-act="open-errand-form">＋ おつかいを頼む</button>';
 
     return `
       <section aria-labelledby="h-errands">
@@ -359,18 +366,29 @@
           <p class="count">今月の支出 <strong class="count-yen">${yen(monthSpent) || '¥0'}</strong></p>
         </div>
         ${form}
-        ${open.length ? open.map(errandCard).join('') : '<p class="empty">頼まれているおつかいはありません。</p>'}
+
+        <div class="errands-group">
+          <h3 class="errands-section-title">頼まれているおつかい（${open.length}件）</h3>
+          ${open.length ? open.map(errandCard).join('') : '<p class="empty">頼まれているおつかいはありません。</p>'}
+        </div>
+
         ${done.length ? `
           <details class="done-list" ${state.doneOpen ? 'open' : ''}>
             <summary>完了したおつかい（最近の${done.length}件）</summary>
             <ul>${done.map((e) => `
               <li>
                 <span class="done-title">${esc(e.title)}</span>
-                <span class="done-meta">${e.spent !== null ? yen(e.spent) : '金額の記録なし'}${e.budget !== null ? `（予算 ${yen(e.budget)}）` : ''}、${esc(ago(e.completedAt))}</span>
+                <span class="done-meta">${e.spent !== null ? yen(e.spent) : '金額の記録なし'}${e.budget !== null ? `（予算 ${yen(e.budget)}）` : ''}、${esc(fmtDateTime(e.completedAt))}完了</span>
                 <button class="link" data-act="reopen-errand" data-id="${esc(e.id)}">未完了に戻す</button>
               </li>`).join('')}
             </ul>
           </details>` : ''}
+
+        <!-- おつかいの下に家族ボードを配置 -->
+        <div class="errands-family-section">
+          <h3 class="errands-section-title">家族のいま</h3>
+          <div class="magnet-board compact-board">${homeMagnets()}</div>
+        </div>
       </section>`;
   }
 
@@ -379,16 +397,23 @@
     return `
       <article class="note errand">
         <div class="errand-head">
-          <h3 class="note-title">${esc(e.title)}</h3>
+          <h4 class="note-title">${esc(e.title)}</h4>
           ${e.budget !== null ? `<p class="budget">予算 ${yen(e.budget)}</p>` : ''}
         </div>
-        <p class="errand-meta">${e.requestedBy ? esc(e.requestedBy) + 'から、' : ''}${esc(ago(e.createdAt))}</p>
+        <p class="errand-meta">${e.requestedBy ? esc(e.requestedBy) + 'が' : ''}${esc(fmtDateTime(e.createdAt))}に起票</p>
         ${e.items.length ? `
           <p class="items-count">買ったもの ${bought} / ${e.items.length}</p>
           <ul class="items">${e.items.map((it, i) => `
             <li><button class="item${it.done ? ' is-done' : ''}" data-act="toggle-item" data-id="${esc(e.id)}" data-index="${i}" aria-pressed="${it.done}">${esc(it.name)}</button></li>`).join('')}
           </ul>` : ''}
-        ${e.memo ? `<p class="memo">${esc(e.memo)}</p>` : ''}
+        ${e.memo ? `
+          <div class="memo-bubble">
+            <span class="memo-bubble-icon" aria-hidden="true">💬</span>
+            <div class="memo-bubble-body">
+              <span class="memo-bubble-label">ひとことメモ</span>
+              <p class="memo-bubble-text">${esc(e.memo)}</p>
+            </div>
+          </div>` : ''}
         <form class="complete" data-id="${esc(e.id)}">
           <label>使った金額（円・任意）<input name="spent" type="number" inputmode="numeric" min="0" placeholder="例：1850"></label>
           <button type="submit" class="btn primary">完了にする</button>
@@ -584,17 +609,40 @@
 
   function statusCard(h) {
     const st = statusOf(h.status);
+    const memberObj = state.data.members.find((m) => m.name === h.member);
+    const memberIcon = (memberObj && memberObj.icon) || '👤';
+
     return `
       <article class="status-card" data-tone="${h.status ? (st ? st.tone : 'out') : 'none'}">
-        <p class="status-who">${esc(h.member)}</p>
-        <p class="status-main"><span aria-hidden="true">${st ? st.emoji : '❔'}</span>${h.status ? esc(h.status) : 'まだ更新がありません'}</p>
+        <div class="status-card-header">
+          <span class="status-card-icon" aria-hidden="true">${esc(memberIcon)}</span>
+          <h3 class="status-who">${esc(h.member)}</h3>
+        </div>
         ${h.status ? `
+          <div class="status-card-grid">
+            <div class="status-card-col">
+              <span class="status-card-label">状況</span>
+              <div class="status-card-val"><span aria-hidden="true">${st ? st.emoji : '📍'}</span> ${esc(h.status)}</div>
+            </div>
+            <div class="status-card-col">
+              <span class="status-card-label">夕飯</span>
+              <div class="status-card-val"><span aria-hidden="true">🍽️</span> ${esc(h.dinner || '未定')}</div>
+            </div>
+          </div>
+          ${h.note ? `
+            <div class="memo-bubble status-bubble">
+              <span class="memo-bubble-icon" aria-hidden="true">💬</span>
+              <div class="memo-bubble-body">
+                <span class="memo-bubble-label">ひとこと</span>
+                <p class="memo-bubble-text">${esc(h.note)}</p>
+              </div>
+            </div>` : ''}
           <dl class="status-list">
             <div><dt>到着予定</dt><dd>${h.eta ? esc(h.eta) + 'ごろ' : '未定'}</dd></div>
-            <div><dt>夕飯</dt><dd>${esc(h.dinner || '未定')}</dd></div>
-            ${h.note ? `<div><dt>ひとこと</dt><dd>${esc(h.note)}</dd></div>` : ''}
-            <div><dt>更新</dt><dd>${esc(fmtTime(h.timestamp))}（${esc(ago(h.timestamp))}）</dd></div>
-          </dl>` : ''}
+            <div><dt>更新日時</dt><dd>${esc(fmtDateTime(h.timestamp))}</dd></div>
+          </dl>` : `
+          <p class="status-empty-text">今日の状況はまだありません</p>
+        `}
       </article>`;
   }
 
